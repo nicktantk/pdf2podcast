@@ -1,0 +1,54 @@
+# Runtime credentials and local connection exports.
+.env
+.env.*
+!.env.example
+mobile.toml
+openai-key
+secret.key
+credentials.json
+InitialSettings.plist
+LocalSettings.plist
+*.pem
+*.key
+*.p12
+*.pfx
+*.cer
+*.mobileprovision
+*.provisionprofile
+
+# Uploaded documents, generated audio, databases and logs stay on the server.
+.pdf2podcast/
+jobs/
+*.pdf
+*.mp3
+*.wav
+*.m4a
+*.sqlite
+*.sqlite3
+*.db
+*.log
+
+# Generated projects, local signing state and build outputs.
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+*.xcuserstate
+*.app/
+*.ipa
+*.dSYM/
+DerivedData/
+build/
+dist/
+.build/
+.swiftpm/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.DS_Store
+
+# Scanner reports may contain sensitive findings; keep them outside the repo.
+gitleaks-report.*
+secret-scan-report.*

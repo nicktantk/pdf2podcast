@@ -1,0 +1,15 @@
+title = "Pdf2Podcast credential detection"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "quoted-long-hex-credential"
+description = "Catch embedded mobile bearer tokens even without a token assignment label."
+regex = '''["'`]([a-fA-F0-9]{48,})["'`]'''
+secretGroup = 1
+
+[[allowlists]]
+description = "A public UserDefaults preference name, not an API credential."
+regexTarget = "secret"
+regexes = ['''^pdf2podcast\.skipSummaries$''']

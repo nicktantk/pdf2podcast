@@ -1,0 +1,69 @@
+name: Pdf2PodcastMac
+options:
+  bundleIdPrefix: io.pdf2podcast
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "26.2"
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.0
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+targets:
+  Pdf2PodcastMac:
+    type: application
+    platform: iOS
+    sources:
+      - path: ../ios/Pdf2Podcast
+        excludes:
+          - Info.plist
+          - Pdf2Podcast.entitlements
+      - path: ../ios/Shared
+      - path: MacPDFImporter.swift
+    entitlements:
+      path: Pdf2PodcastMac.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.files.user-selected.read-only: true
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)io.pdf2podcast.mac
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Pdf2Podcast
+        LSApplicationCategoryType: public.app-category.books
+        Pdf2PodcastSharedKeychainGroup: $(AppIdentifierPrefix)io.pdf2podcast.mac
+        UIBackgroundModes:
+          - audio
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+          NSAllowsLocalNetworking: true
+          NSExceptionDomains:
+            127.0.0.1:
+              NSTemporaryExceptionAllowsInsecureHTTPLoads: true
+              NSIncludesSubdomains: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.pdf2podcast.mac
+        PRODUCT_NAME: Pdf2Podcast
+        TARGETED_DEVICE_FAMILY: "2"
+        SUPPORTS_MACCATALYST: YES
+        DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+schemes:
+  Pdf2PodcastMac:
+    build:
+      targets:
+        Pdf2PodcastMac: all
