@@ -45,8 +45,14 @@ set +a
 pdf2podcast-server --host 127.0.0.1 --port 8766
 ```
 
+On Windows, run the same commands in Git Bash, using `python -m venv .venv`,
+`source .venv/Scripts/activate`, and skipping `chmod`. FFmpeg can be installed with
+`winget install Gyan.FFmpeg`; open a new terminal afterwards so it is on `PATH`.
+
 The server accepts `OPENAI_API_KEY`, or a private key file selected with
-`PDF2PODCAST_OPENAI_KEY_FILE`. Uploaded PDFs, checkpoints, transcripts, and finished
+`PDF2PODCAST_OPENAI_KEY_FILE`. To use DeepSeek instead, uncomment the DeepSeek block
+in `.env`; it sets `DEEPSEEK_API_KEY`, the DeepSeek base URL and model, and a higher
+output token limit. Uploaded PDFs, checkpoints, transcripts, and finished
 audio remain under `PDF2PODCAST_DATA_DIR`, which defaults to `~/.pdf2podcast`.
 Speech currently uses Edge TTS; an ElevenLabs integration is not included.
 

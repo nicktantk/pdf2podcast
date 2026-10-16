@@ -50,6 +50,9 @@ GUIDE_VOICE = os.environ.get(
     "PDF2PODCAST_GUIDE_VOICE", "en-US-AvaMultilingualNeural"
 )
 SCRIPT_MODEL = os.environ.get("PDF2PODCAST_SCRIPT_MODEL", "gpt-4.1-mini")
+# Set to https://api.deepseek.com to use DeepSeek instead of OpenAI.
+LLM_BASE_URL = os.environ.get("PDF2PODCAST_LLM_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+SCRIPT_MAX_TOKENS = int(os.environ.get("PDF2PODCAST_SCRIPT_MAX_TOKENS", "0"))
 MAX_UPLOAD_BYTES = int(os.environ.get("PDF2PODCAST_MAX_UPLOAD_BYTES", 100 * 1024 * 1024))
 SCRIPT_CHUNK_CHARS = int(os.environ.get("PDF2PODCAST_SCRIPT_CHUNK_CHARS", 28_000))
 JOB_ID = re.compile(r"^pdf-[a-f0-9]{16}$")
@@ -140,7 +143,7 @@ def request_openai_json(body: dict[str, Any]) -> dict[str, Any]:
     for attempt in range(6):
         delay = min(60, 2 ** attempt) + random.uniform(0.25, 1.25)
         request = urllib.request.Request(
-            "https://api.openai.com/v1/chat/completions", data=json.dumps(body).encode(),
+            f"{LLM_BASE_URL}/chat/completions", data=json.dumps(body).encode(),
             headers={"Authorization": f"Bearer {openai_key()}", "Content-Type": "application/json"}, method="POST",
         )
         shared_cooldown = False
@@ -224,14 +227,23 @@ def now() -> str:
 
 def atomic_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2))
-    temporary.replace(path)
+    # Unique per write so concurrent writers never share a temporary file.
+    temporary = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    for attempt in range(50):
+        try:
+            temporary.replace(path)
+            return
+        except PermissionError:
+            # Windows refuses to replace a file another thread has open for reading.
+            if attempt == 49:
+                raise
+            time.sleep(0.02)
 
 
 def read_json(path: Path, default: Any = None) -> Any:
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return default
 
@@ -335,14 +347,16 @@ def chunk_pages(pages: list[dict[str, Any]]) -> list[str]:
 
 
 def openai_key() -> str:
-    direct = os.environ.get("OPENAI_API_KEY", "").strip()
+    # Match the key to the provider so one provider's key is never sent to the other.
+    name = "DEEPSEEK_API_KEY" if "deepseek.com" in LLM_BASE_URL else "OPENAI_API_KEY"
+    direct = os.environ.get(name, "").strip()
     if direct:
         return direct
     path = Path(
         os.environ.get("PDF2PODCAST_OPENAI_KEY_FILE", "~/.pdf2podcast/openai-key")
     ).expanduser()
     try:
-        return path.read_text().strip()
+        return path.read_text(encoding="utf-8").strip()
     except OSError as error:
         raise RuntimeError("The Pdf2Podcast OpenAI key file is missing.") from error
 
@@ -381,6 +395,8 @@ def create_script(
         ],
         "response_format": {"type": "json_object"},
     }
+    if SCRIPT_MAX_TOKENS > 0:
+        request_body["max_tokens"] = SCRIPT_MAX_TOKENS
     last_error: Exception | None = None
     for attempt in range(5):
         try:
@@ -604,7 +620,7 @@ def concatenate(inputs: list[Path], output: Path) -> None:
     for path in inputs:
         escaped = str(path.resolve()).replace("'", "'\\''")
         lines.append(f"file '{escaped}'\n")
-    manifest.write_text("".join(lines))
+    manifest.write_text("".join(lines), encoding="utf-8")
     result = subprocess.run(
         [
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
@@ -961,7 +977,7 @@ def process_job(job_id: str) -> None:
         chunks = annotation_batches(document, SCRIPT_CHUNK_CHARS)
         atomic_json(root / "extracted.json", document)
         (root / "extracted.txt").write_text(
-            "\n".join(f"[page {line['page']}, line {line['id']}] {line['text']}" for line in document["lines"])
+            "\n".join(f"[page {line['page']}, line {line['id']}] {line['text']}" for line in document["lines"]), encoding="utf-8",
         )
         save_job(
             job_id,
@@ -1067,7 +1083,8 @@ def process_job(job_id: str) -> None:
             "\n\n".join(
                 f"[{'Guide' if line['speaker'] == 'guide' else 'Source'}]\n{line['text']}"
                 for line in global_lines
-            )
+            ),
+            encoding="utf-8",
         )
         save_job(
             job_id,
@@ -1116,7 +1133,7 @@ def schedule_retry(job_id: str) -> None:
         if job.get("status") != "failed" or not job.get("retry_until_complete"):
             return
         error = str(job.get("error") or "")
-        if any(marker in error.lower() for marker in ("insufficient_quota", "invalid_api_key", "http 401", "http 403", "password protected", "no extractable text was found")):
+        if any(marker in error.lower() for marker in ("insufficient_quota", "invalid_api_key", "http 401", "http 402", "http 403", "password protected", "no extractable text was found")):
             save_job(job_id, stage="Needs attention before retrying", retry_until_complete=False)
             return
         attempts = int(job.get("retry_attempts") or 0) + 1
